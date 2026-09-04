@@ -22,3 +22,21 @@ describe("ID-based grading", () => {
     expect(quiz.questions[0].id).toBe("science-2026-09-04-q1");
   });
 });
+
+describe("structured-answer ambiguity", () => {
+  it("rejects the reported open-ended playground question", () => {
+    const questions = structuredClone(validQuestions);
+    questions[6].prompt = "Name one non-living thing found on a playground.";
+    questions[6].correctAnswer = "rock";
+    questions[6].acceptedAnswers = ["rock", "rocks"];
+    const result = quizSchema.safeParse({ title: "Science", questions });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.some((issue) => issue.message.includes("many possible"))).toBe(true);
+  });
+
+  it.each(["Give an example of a magnetic object.", "Suggest a material for a raincoat.", "State one living thing."])("rejects ambiguous wording: %s", (prompt) => {
+    const questions = structuredClone(validQuestions);
+    questions[6].prompt = prompt;
+    expect(quizSchema.safeParse({ title: "Science", questions }).success).toBe(false);
+  });
+});

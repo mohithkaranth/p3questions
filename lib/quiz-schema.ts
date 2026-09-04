@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+const ambiguousShortAnswerPattern = /\b(name|state|mention|list|identify)\s+(any\s+)?one\b|\bgive\s+(one|an)\s+example\b|\bsuggest\b|\bwhat\s+is\s+one\b/i;
+export function hasAmbiguousShortAnswerWording(prompt: string) { return ambiguousShortAnswerPattern.test(prompt); }
+
 export const subjectSchema = z.enum(["math", "science"]);
 export type Subject = z.infer<typeof subjectSchema>;
 
@@ -14,6 +17,7 @@ export const quizSchema = z.object({ title: z.string().min(1), questions: z.arra
   quiz.questions.forEach((q, index) => {
     if (index < 6 && (q.section !== "A" || q.type !== "mcq" || q.choices.length !== 4)) ctx.addIssue({ code: "custom", path: ["questions", index], message: "Questions 1–6 must be Section A MCQs with four choices" });
     if (index >= 6 && (q.section !== "B" || q.type !== "short" || q.choices.length !== 0)) ctx.addIssue({ code: "custom", path: ["questions", index], message: "Questions 7–10 must be Section B short answers" });
+    if (q.type === "short" && hasAmbiguousShortAnswerWording(q.prompt)) ctx.addIssue({ code: "custom", path: ["questions", index, "prompt"], message: "Short-answer question allows many possible correct responses" });
     if (!q.acceptedAnswers.some((a) => normalizeAnswer(a) === normalizeAnswer(q.correctAnswer))) ctx.addIssue({ code: "custom", path: ["questions", index, "acceptedAnswers"], message: "Must include correct answer" });
     if (q.type === "mcq" && !q.choices.includes(q.correctAnswer)) ctx.addIssue({ code: "custom", path: ["questions", index, "correctAnswer"], message: "MCQ answer must match a choice" });
   });
