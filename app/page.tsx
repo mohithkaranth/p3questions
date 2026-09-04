@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DailyDiscovery from "./daily-discovery";
 export default function Home() {
   return <main className="home-shell">
     <div className="sky-decor star-one">✦</div><div className="sky-decor star-two">★</div>
@@ -6,6 +7,6 @@ export default function Home() {
     <section className="subject-grid" aria-label="Choose a subject">
       <Link className="subject-card math-card" href="/quiz/math"><span className="card-bubble">➗</span><span className="card-copy"><span className="card-kicker">NUMBER NINJA</span><strong>Math</strong><span>Crack clever sums and word problems!</span></span><span className="go-button">Start quest →</span></Link>
       <Link className="subject-card science-card" href="/quiz/science"><span className="card-bubble">🔬</span><span className="card-copy"><span className="card-kicker">CURIOUS EXPLORER</span><strong>Science</strong><span>Discover the amazing world around you!</span></span><span className="go-button">Start quest →</span></Link>
-    </section><footer className="home-footer">☀️　Made with love for Eira　🌈</footer>
+    </section><DailyDiscovery/><footer className="home-footer">☀️　Made with love for Eira　🌈</footer>
   </main>;
 }
