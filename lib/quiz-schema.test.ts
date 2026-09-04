@@ -1,0 +1,4 @@
+import { describe, expect, it } from "vitest";
+import { normalizeAnswer, quizSchema } from "./quiz-schema";
+const validQuestions = Array.from({length:10},(_,i)=>({id:`q${i+1}`,section:i<6?"A" as const:"B" as const,type:i<6?"mcq" as const:"short" as const,topic:"Test",prompt:"This is a clear sample question?",choices:i<6?["1","2","3","4"]:[],correctAnswer:"1",acceptedAnswers:["1"],explanation:"One is the correct answer."}));
+describe("quiz validation",()=>{it("accepts the required structure",()=>expect(quizSchema.safeParse({title:"Daily quiz",questions:validQuestions}).success).toBe(true));it("rejects an answer outside choices",()=>{const questions=structuredClone(validQuestions);questions[0].correctAnswer="5";questions[0].acceptedAnswers=["5"];expect(quizSchema.safeParse({title:"Daily quiz",questions}).success).toBe(false)});it("normalises formatting",()=>expect(normalizeAnswer("  $1,200.  ")).toBe("1200"))});
