@@ -14,4 +14,6 @@ Answers remain server-side until submission. Quizzes use OpenAI Structured Outpu
 
 Connect this repository to the existing Vercel project and add `OPENAI_API_KEY` under Project Settings → Environment Variables. No other service is required; Vercel's Data Cache stores the shared daily sets. `OPENAI_QUIZ_MODEL` is optional and defaults to `gpt-5-mini`.
 
+The repository's `vercel.json` selects the Next.js framework and clears any stale static `public` output-directory override from the project settings.
+
 Run `npm test`, `npm run lint`, and `npm run build` before deployment.
