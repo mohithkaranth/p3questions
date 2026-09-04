@@ -12,7 +12,6 @@ export const questionSchema = z.object({
 export const quizSchema = z.object({ title: z.string().min(1), questions: z.array(questionSchema).length(10) }).superRefine((quiz, ctx) => {
   if (new Set(quiz.questions.map((q) => q.id)).size !== 10) ctx.addIssue({ code: "custom", message: "Question IDs must be unique" });
   quiz.questions.forEach((q, index) => {
-    if (q.id !== `q${index + 1}`) ctx.addIssue({ code: "custom", path: ["questions", index, "id"], message: `Expected q${index + 1}` });
     if (index < 6 && (q.section !== "A" || q.type !== "mcq" || q.choices.length !== 4)) ctx.addIssue({ code: "custom", path: ["questions", index], message: "Questions 1–6 must be Section A MCQs with four choices" });
     if (index >= 6 && (q.section !== "B" || q.type !== "short" || q.choices.length !== 0)) ctx.addIssue({ code: "custom", path: ["questions", index], message: "Questions 7–10 must be Section B short answers" });
     if (!q.acceptedAnswers.some((a) => normalizeAnswer(a) === normalizeAnswer(q.correctAnswer))) ctx.addIssue({ code: "custom", path: ["questions", index, "acceptedAnswers"], message: "Must include correct answer" });
@@ -25,3 +24,16 @@ export type Question = z.infer<typeof questionSchema>;
 export type PublicQuestion = Omit<Question, "correctAnswer" | "acceptedAnswers" | "explanation">;
 export function normalizeAnswer(value: string) { return value.trim().toLocaleLowerCase("en-SG").replace(/[,$]/g, "").replace(/\s+/g, " ").replace(/[.!?]+$/, ""); }
 export function toPublicQuiz(quiz: Quiz) { return { title: quiz.title, questions: quiz.questions.map((q) => ({ id: q.id, section: q.section, type: q.type, topic: q.topic, prompt: q.prompt, choices: q.choices })) }; }
+
+export type QuizMark = { id: string; userAnswer: string; isCorrect: boolean; correctAnswer: string; explanation: string };
+export function gradeQuizById(quiz: Quiz, answers: Record<string, string>): QuizMark[] {
+  return Object.entries(answers).map(([id, userAnswer]) => {
+    const question = quiz.questions.find((candidate) => candidate.id === id);
+    if (!question) throw new Error(`Unknown question ID: ${id}`);
+    return { id, userAnswer, isCorrect: question.acceptedAnswers.some((accepted) => normalizeAnswer(accepted) === normalizeAnswer(userAnswer)), correctAnswer: question.correctAnswer, explanation: question.explanation };
+  });
+}
+
+export function assignStableQuestionIds(quiz: Quiz, subject: Subject, date: string): Quiz {
+  return quizSchema.parse({ ...quiz, questions: quiz.questions.map((question, index) => ({ ...question, id: `${subject}-${date}-q${index + 1}` })) });
+}

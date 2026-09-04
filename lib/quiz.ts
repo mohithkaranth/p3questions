@@ -2,7 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { unstable_cache } from "next/cache";
-import { quizSchema, type Quiz, type Subject } from "./quiz-schema";
+import { assignStableQuestionIds, quizSchema, type Quiz, type Subject } from "./quiz-schema";
 
 const scopes: Record<Subject, string> = {
   math: "Whole numbers up to 10,000; addition and subtraction; multiplication and division; fractions; money in Singapore dollars; length, mass and volume; time; area and perimeter; angles; bar graphs. Include Singapore-style word problems.",
@@ -23,12 +23,21 @@ async function generateQuiz(subject: Subject, singaporeDate: string): Promise<Qu
       text: { format: zodTextFormat(quizSchema, "daily_quiz") },
     });
     if (!response.output_parsed) throw new QuizGenerationError("The model returned no usable quiz.");
-    return quizSchema.parse(response.output_parsed);
+    const generated = quizSchema.parse(response.output_parsed);
+    return assignStableQuestionIds(generated, subject, singaporeDate);
   } catch (error) {
     if (error instanceof QuizGenerationError) throw error;
     console.error("Quiz generation failed", { subject, singaporeDate, error });
     throw new QuizGenerationError("We could not prepare today's quiz.", { cause: error });
   }
 }
-const getCachedQuiz = unstable_cache(async (subject: Subject, date: string) => generateQuiz(subject, date), ["daily-p3-quiz-v1"], { revalidate: false, tags: ["daily-p3-quiz"] });
-export async function getDailyQuiz(subject: Subject, date: string) { return getCachedQuiz(subject, date); }
+export async function getDailyQuiz(subject: Subject, date: string) {
+  const cacheKey = getDailyQuizCacheKey(subject, date);
+  return unstable_cache(
+    () => generateQuiz(subject, date),
+    [cacheKey],
+    { revalidate: false, tags: [cacheKey] },
+  )();
+}
+
+export function getDailyQuizCacheKey(subject: Subject, date: string) { return `daily-p3-quiz-v2:${subject}:${date}`; }
