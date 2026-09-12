@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { apiMessages, friendlyError, readApiResponse } from "@/lib/api-response";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PublicQuestion, Subject } from "@/lib/quiz-schema";
 type QuizPayload = { date: string; subject: Subject; title: string; questions: PublicQuestion[] };
@@ -9,10 +10,10 @@ type Result = { score: number; total: number; results: Mark[] };
 export default function QuizClient({ subject }: { subject: Subject }) {
   const [quiz, setQuiz] = useState<QuizPayload | null>(null), [answers, setAnswers] = useState<Record<string,string>>({}), [result, setResult] = useState<Result|null>(null);
   const [error, setError] = useState(""), [loading, setLoading] = useState(true), [submitting, setSubmitting] = useState(false), [attempt, setAttempt] = useState(0);
-  useEffect(() => { const controller = new AbortController(); fetch(`/api/quiz/${subject}`, { signal: controller.signal }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Could not load today's quiz."); return d as QuizPayload; }).then(setQuiz).catch((e: unknown) => { if (e instanceof Error && e.name !== "AbortError") setError(e.message); }).finally(() => setLoading(false)); return () => controller.abort(); }, [subject, attempt]);
+  useEffect(() => { const controller = new AbortController(); fetch(`/api/quiz/${subject}`, { signal: controller.signal }).then((response) => readApiResponse<QuizPayload>(response, apiMessages.QUIZ_UNAVAILABLE)).then(setQuiz).catch((e: unknown) => { if (e instanceof Error && e.name !== "AbortError") setError(friendlyError(e, apiMessages.QUIZ_UNAVAILABLE)); }).finally(() => setLoading(false)); return () => controller.abort(); }, [subject, attempt]);
   const answeredCount = useMemo(() => quiz?.questions.filter((q) => answers[q.id]?.trim()).length ?? 0, [answers, quiz]);
   const marksById = useMemo(() => new Map(result?.results.map((mark) => [mark.id, mark]) ?? []), [result]);
-  async function submit(event: FormEvent) { event.preventDefault(); if (!quiz || answeredCount !== 10) { setError("Almost there! Please answer all 10 questions first."); return; } setSubmitting(true); setError(""); try { const response = await fetch(`/api/quiz/${subject}/submit`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({date:quiz.date,answers}) }); const data=await response.json(); if(!response.ok) throw new Error(data.error||"Could not mark the quiz."); setResult(data); window.scrollTo({top:0,behavior:"smooth"}); } catch(e) { setError(e instanceof Error?e.message:"Could not mark the quiz."); } finally { setSubmitting(false); } }
+  async function submit(event: FormEvent) { event.preventDefault(); if (!quiz || answeredCount !== 10) { setError("Almost there! Please answer all 10 questions first."); return; } setSubmitting(true); setError(""); try { const response = await fetch(`/api/quiz/${subject}/submit`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({date:quiz.date,answers}) }); const data=await readApiResponse<Result>(response, apiMessages.GRADING_UNAVAILABLE); setResult(data); window.scrollTo({top:0,behavior:"smooth"}); } catch(e) { setError(friendlyError(e, apiMessages.GRADING_UNAVAILABLE)); } finally { setSubmitting(false); } }
   const name=subject==="math"?"Math":"Science", icon=subject==="math"?"➗":"🔬";
   return <main className={`quiz-shell ${subject}-theme`}><header className="quiz-header"><Link className="home-button" href="/">← Home</Link><div className="quiz-heading"><span>{icon}</span><div><p>DAILY P3 QUEST</p><h1>{name}</h1></div></div><div className="progress-pill">{answeredCount}/10 answered</div></header>
     {loading&&<section className="state-card"><div className="loader"/><h2>Making today’s fresh quiz…</h2><p>Our question robot is thinking carefully!</p></section>}
