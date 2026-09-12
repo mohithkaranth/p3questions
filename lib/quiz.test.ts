@@ -92,7 +92,7 @@ describe("daily quiz cache", () => {
     await getDailyQuiz("science", "2026-09-12");
     await getDailyQuiz("math", "2026-09-13");
     expect(parse).toHaveBeenCalledTimes(3);
-    expect(getDailyQuizCacheKey("math", "2026-09-12")).toBe("daily-p3-quiz-v4:math:2026-09-12");
+    expect(getDailyQuizCacheKey("math", "2026-09-12")).toBe("daily-p3-quiz-v5:math:2026-09-12");
   });
 
   it("coalesces simultaneous loads", async () => {

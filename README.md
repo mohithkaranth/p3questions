@@ -22,6 +22,10 @@ OpenAI calls share a 45-second generation budget with SDK retries disabled. API
 handlers return JSON by 50 seconds, before the 60-second Vercel function limit.
 Quiz validation retries share the same abort signal; grading only reads the cache.
 Clients check HTTP status and Content-Type, and display only known friendly errors.
+Loading and grading share the `/api/quiz/[subject]` route bundle; the existing
+`/submit` URL rewrites to its POST handler. This avoids Next.js callback-source
+cache keys diverging between separately compiled route modules. Cache namespace
+`v5` replaces the older separate-route entries; stale quizzes require a refresh.
 
 Production diagnostics: `npx vercel logs --project p3questions --environment production --since 1h`.
 Generation logs include subject, date, model and key presence, never the key or raw

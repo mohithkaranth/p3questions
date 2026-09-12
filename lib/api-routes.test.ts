@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Quiz } from "./quiz-schema";
 
 const { load, cached, discovery } = vi.hoisted(() => ({ load: vi.fn(), cached: vi.fn(), discovery: vi.fn() }));
-vi.mock("@/lib/quiz", () => ({ getDailyQuiz: load, getCachedDailyQuiz: cached }));
+vi.mock("@/lib/quiz", () => ({ getDailyQuiz: load, getCachedDailyQuiz: cached, QuizCacheMissError: class extends Error {} }));
 vi.mock("@/lib/daily-discovery", () => ({ getDailyDiscovery: discovery }));
 vi.mock("@/lib/singapore-date", () => ({ getSingaporeDate: () => "2026-09-12" }));
-import { GET } from "../app/api/quiz/[subject]/route";
-import { POST } from "../app/api/quiz/[subject]/submit/route";
+import { GET, POST } from "../app/api/quiz/[subject]/route";
+import { QuizCacheMissError } from "./quiz";
+import nextConfig from "../next.config";
 import { GET as discoveryGET } from "../app/api/daily-discovery/route";
 
 const quiz: Quiz = { title: "Quiz", questions: Array.from({ length: 10 }, (_, i) => ({
@@ -31,6 +32,14 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("API JSON contracts", () => {
+  it("routes the legacy submission URL into the same generation and grading bundle", async () => {
+    expect(await nextConfig.rewrites!()).toContainEqual({ source: "/api/quiz/:subject/submit", destination: "/api/quiz/:subject" });
+  });
+  it("asks for a refresh on cache loss without generating a replacement during submission", async () => {
+    cached.mockRejectedValue(new QuizCacheMissError());
+    expect((await expectJson(await POST(submission(), context()), 409)).code).toBe("QUIZ_EXPIRED");
+    expect(load).not.toHaveBeenCalled();
+  });
   it.each(["math", "science"])("returns JSON for %s loading and grading", async (subject) => {
     const data = await expectJson(await GET(new Request("https://example.test"), context(subject)), 200);
     expect(data.questions[0]).not.toHaveProperty("correctAnswer");

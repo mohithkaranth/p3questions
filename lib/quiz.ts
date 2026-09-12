@@ -17,6 +17,10 @@ export class QuizGenerationError extends Error {
   constructor(message: string, options?: ErrorOptions) { super(message, options); this.name = "QuizGenerationError"; }
 }
 
+export class QuizCacheMissError extends Error {
+  constructor() { super("Daily quiz cache missing; reload the quiz before submitting."); this.name = "QuizCacheMissError"; }
+}
+
 async function generateQuiz(subject: Subject, singaporeDate: string): Promise<Quiz> {
   try {
     const { apiKey, model } = getOpenAIConfig();
@@ -61,7 +65,7 @@ async function generateQuiz(subject: Subject, singaporeDate: string): Promise<Qu
 const generationAllowed = new AsyncLocalStorage<boolean>();
 const pending = new Map<string, Promise<Quiz>>();
 const cachedQuiz = unstable_cache(async (subject: Subject, date: string) => {
-  if (!generationAllowed.getStore()) throw new Error("Daily quiz cache missing; reload the quiz before submitting.");
+  if (!generationAllowed.getStore()) throw new QuizCacheMissError();
   const key = getDailyQuizCacheKey(subject, date);
   let quiz = pending.get(key);
   if (!quiz) {
@@ -70,7 +74,7 @@ const cachedQuiz = unstable_cache(async (subject: Subject, date: string) => {
   }
   try { return await quiz; }
   finally { if (pending.get(key) === quiz) pending.delete(key); }
-}, ["daily-p3-quiz-v4"], { revalidate: false });
+}, ["daily-p3-quiz-v5"], { revalidate: false });
 
 export async function getDailyQuiz(subject: Subject, date: string) {
   return generationAllowed.run(true, () => cachedQuiz(subject, date));
@@ -80,4 +84,4 @@ export async function getCachedDailyQuiz(subject: Subject, date: string) {
   return generationAllowed.run(false, () => cachedQuiz(subject, date));
 }
 
-export function getDailyQuizCacheKey(subject: Subject, date: string) { return `daily-p3-quiz-v4:${subject}:${date}`; }
+export function getDailyQuizCacheKey(subject: Subject, date: string) { return `daily-p3-quiz-v5:${subject}:${date}`; }
