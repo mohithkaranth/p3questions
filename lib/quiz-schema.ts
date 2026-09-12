@@ -26,7 +26,12 @@ export const quizSchema = z.object({ title: z.string().min(1), questions: z.arra
 export type Quiz = z.infer<typeof quizSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type PublicQuestion = Omit<Question, "correctAnswer" | "acceptedAnswers" | "explanation">;
-export function normalizeAnswer(value: string) { return value.trim().toLocaleLowerCase("en-SG").replace(/[,$]/g, "").replace(/\s+/g, " ").replace(/[.!?]+$/, ""); }
+export function normalizeAnswer(value: string) {
+  const text = value.trim().toLocaleLowerCase("en-SG");
+  // Never strip decimal points, signs, fractions or units from numerical answers.
+  if (/\d/.test(text)) return text.replace(/[,$\s]/g, "").replace(/[.!?]+$/, "");
+  return text.replace(/[.,!?;:'"()\[\]{}-]/g, " ").trim().replace(/\s+/g, " ").replace(/^(a|an|the)\s+/, "");
+}
 export function toPublicQuiz(quiz: Quiz) { return { title: quiz.title, questions: quiz.questions.map((q) => ({ id: q.id, section: q.section, type: q.type, topic: q.topic, prompt: q.prompt, choices: q.choices })) }; }
 
 export type QuizMark = { id: string; userAnswer: string; isCorrect: boolean; correctAnswer: string; explanation: string };
@@ -38,6 +43,6 @@ export function gradeQuizById(quiz: Quiz, answers: Record<string, string>): Quiz
   });
 }
 
-export function assignStableQuestionIds(quiz: Quiz, subject: Subject, date: string): Quiz {
-  return quizSchema.parse({ ...quiz, questions: quiz.questions.map((question, index) => ({ ...question, id: `${subject}-${date}-q${index + 1}` })) });
+export function assignStableQuestionIds(quiz: Quiz, subject: Subject, date: string, revision?: string): Quiz {
+  return quizSchema.parse({ ...quiz, questions: quiz.questions.map((question, index) => ({ ...question, id: `${subject}-${date}-${revision ? `${revision}-` : ""}q${index + 1}` })) });
 }

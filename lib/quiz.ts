@@ -1,4 +1,6 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { unstable_cache } from "next/cache";
@@ -29,7 +31,9 @@ async function generateQuiz(subject: Subject, singaporeDate: string): Promise<Qu
           text: { format: zodTextFormat(quizSchema, "daily_quiz") },
         });
         if (!response.output_parsed) throw new QuizGenerationError("The model returned no usable quiz.");
-        return assignStableQuestionIds(quizSchema.parse(response.output_parsed), subject, singaporeDate);
+        const quiz = quizSchema.parse(response.output_parsed);
+        const revision = createHash("sha256").update(JSON.stringify(quiz)).digest("hex");
+        return assignStableQuestionIds(quiz, subject, singaporeDate, revision);
       } catch (error) {
         if (error instanceof z.ZodError && attempt < 3) {
           console.warn("Rejected ambiguous or invalid quiz; retrying", { subject, singaporeDate, attempt, issues: error.issues });
@@ -46,9 +50,28 @@ async function generateQuiz(subject: Subject, singaporeDate: string): Promise<Qu
   }
 }
 
+// Permission is request-local and deliberately excluded from cache identity. Both
+// routes call the very same cached function with the same subject/date arguments.
+const generationAllowed = new AsyncLocalStorage<boolean>();
+const pending = new Map<string, Promise<Quiz>>();
+const cachedQuiz = unstable_cache(async (subject: Subject, date: string) => {
+  if (!generationAllowed.getStore()) throw new Error("Daily quiz cache missing; reload the quiz before submitting.");
+  const key = getDailyQuizCacheKey(subject, date);
+  let quiz = pending.get(key);
+  if (!quiz) {
+    quiz = generateQuiz(subject, date);
+    pending.set(key, quiz);
+  }
+  try { return await quiz; }
+  finally { if (pending.get(key) === quiz) pending.delete(key); }
+}, ["daily-p3-quiz-v4"], { revalidate: false });
+
 export async function getDailyQuiz(subject: Subject, date: string) {
-  const cacheKey = getDailyQuizCacheKey(subject, date);
-  return unstable_cache(() => generateQuiz(subject, date), [cacheKey], { revalidate: false, tags: [cacheKey] })();
+  return generationAllowed.run(true, () => cachedQuiz(subject, date));
 }
 
-export function getDailyQuizCacheKey(subject: Subject, date: string) { return `daily-p3-quiz-v3:${subject}:${date}`; }
+export async function getCachedDailyQuiz(subject: Subject, date: string) {
+  return generationAllowed.run(false, () => cachedQuiz(subject, date));
+}
+
+export function getDailyQuizCacheKey(subject: Subject, date: string) { return `daily-p3-quiz-v4:${subject}:${date}`; }

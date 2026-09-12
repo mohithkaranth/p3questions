@@ -4,6 +4,29 @@ const validQuestions = Array.from({length:10},(_,i)=>({id:`q${i+1}`,section:i<6?
 describe("quiz validation",()=>{it("accepts the required structure",()=>expect(quizSchema.safeParse({title:"Daily quiz",questions:validQuestions}).success).toBe(true));it("rejects an answer outside choices",()=>{const questions=structuredClone(validQuestions);questions[0].correctAnswer="5";questions[0].acceptedAnswers=["5"];expect(quizSchema.safeParse({title:"Daily quiz",questions}).success).toBe(false)});it("normalises formatting",()=>expect(normalizeAnswer("  $1,200.  ")).toBe("1200"))});
 
 describe("ID-based grading", () => {
+  it.each(["math", "science"] as const)("keeps %s answers attached to shuffled questions", (subject) => {
+    const questions = validQuestions.map((q, i) => ({ ...q, correctAnswer: `${i + 1}`, acceptedAnswers: [`${i + 1}`], choices: i < 6 ? [`${i + 1}`, "20", "30", "40"] : [] }));
+    const quiz = assignStableQuestionIds({ title: subject, questions }, subject, "2026-09-12", "revision");
+    const displayed = toPublicQuiz(quiz).questions.reverse();
+    const answers = Object.fromEntries(displayed.map((q) => [q.id, quiz.questions.find((item) => item.id === q.id)!.correctAnswer]));
+    const shuffled = { ...quiz, questions: [...quiz.questions.slice(3), ...quiz.questions.slice(0, 3)] };
+    expect(gradeQuizById(shuffled, answers).every((mark) => mark.isCorrect)).toBe(true);
+    answers[quiz.questions[0].id] = quiz.questions[1].correctAnswer;
+    expect(gradeQuizById(shuffled, answers).find((mark) => mark.id === quiz.questions[0].id)?.isCorrect).toBe(false);
+  });
+
+  it.each(["A Bird", "a bird", "Bird", " THE   Bird! ", "an bird"])("accepts harmless text formatting: %s", (answer) => {
+    const quiz = { title: "Science", questions: [{ ...validQuestions[6], correctAnswer: "Bird", acceptedAnswers: ["Bird"] }] };
+    expect(gradeQuizById(quiz, { q7: answer })[0].isCorrect).toBe(true);
+  });
+
+  it.each(["1,200", "1 200", "  $ 1,200  "])("accepts numerical formatting: %s", (answer) => {
+    expect(normalizeAnswer(answer)).toBe(normalizeAnswer("1200"));
+  });
+
+  it.each([["1.2", "12"], ["-12", "12"], ["1/2", "12"], ["120", "1200"], ["12 cm", "12 m"]])("keeps %s distinct from %s", (answer, expected) => {
+    expect(normalizeAnswer(answer)).not.toBe(normalizeAnswer(expected));
+  });
   it("maps every displayed question to its own answer even when submissions are reordered", () => {
     const questions = structuredClone(validQuestions);
     questions[0] = { ...questions[0], prompt: "Which group contains only living things?", choices: ["Ant, Grass, Flower", "Rock, Ant, Water", "Chair, Flower, Soil", "Water, Air, Grass"], correctAnswer: "Ant, Grass, Flower", acceptedAnswers: ["Ant, Grass, Flower"], explanation: "Ants, grass and flowers are all living things." };

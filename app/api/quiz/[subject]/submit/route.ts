@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDailyQuiz } from "@/lib/quiz";
+import { getCachedDailyQuiz } from "@/lib/quiz";
 import { gradeQuizById, subjectSchema } from "@/lib/quiz-schema";
 import { getSingaporeDate } from "@/lib/singapore-date";
 export const runtime = "nodejs"; export const maxDuration = 60;
@@ -12,7 +12,7 @@ export async function POST(request: Request, context: RouteContext<"/api/quiz/[s
     const body = submissionSchema.safeParse(await request.json());
     if (!body.success) return NextResponse.json({ error: "Please answer all 10 questions before submitting." }, { status: 400 });
     if (body.data.date !== getSingaporeDate()) return NextResponse.json({ error: "A new daily quiz is ready! Please refresh for today's questions." }, { status: 409 });
-    const quiz = await getDailyQuiz(subject.data, body.data.date); const ids = quiz.questions.map((q) => q.id);
+    const quiz = await getCachedDailyQuiz(subject.data, body.data.date); const ids = quiz.questions.map((q) => q.id);
     if (Object.keys(body.data.answers).some((id) => !ids.includes(id)) || ids.some((id) => !body.data.answers[id]?.trim())) return NextResponse.json({ error: "Please answer all 10 questions before submitting." }, { status: 400 });
     const results = gradeQuizById(quiz, body.data.answers);
     return NextResponse.json({ score: results.filter((r) => r.isCorrect).length, total: 10, results });
