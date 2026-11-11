@@ -6,7 +6,7 @@ describe("OpenAI configuration", () => {
   it("reads and trims the server key and default model", () => {
     vi.stubEnv("OPENAI_API_KEY", " test-key ");
     vi.stubEnv("OPENAI_QUIZ_MODEL", "");
-    expect(getOpenAIConfig()).toEqual({ apiKey: "test-key", model: "gpt-5-mini" });
+    expect(getOpenAIConfig()).toEqual({ apiKey: "test-key", model: "gpt-6.1-terra" });
   });
   it("preserves the configured model", () => {
     vi.stubEnv("OPENAI_API_KEY", "test-key");
