@@ -4,7 +4,7 @@ export const OPENAI_BUDGET_MS = 45_000;
 export function getOpenAIConfig() {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey || apiKey === "your_openai_api_key_here") throw new Error("OPENAI_API_KEY is not configured.");
-  return { apiKey, model: process.env.OPENAI_QUIZ_MODEL?.trim() || "gpt-5-mini" };
+  return { apiKey, model: process.env.OPENAI_QUIZ_MODEL?.trim() || "gpt-5.6-terra" };
 }
 
 export function createOpenAIClient(apiKey: string) {
